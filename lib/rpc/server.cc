@@ -46,6 +46,9 @@ struct server::impl {
                     suppress_exceptions_);
                 s->start();
                 sessions_.push_back(s);
+                if (callback_on_connection_) {
+                    callback_on_connection_(s);
+                }
             } else {
                 LOG_ERROR("Error while accepting connection: {}", ec);
             }
@@ -73,6 +76,8 @@ struct server::impl {
     rpc::detail::thread_group loop_workers_;
     std::vector<std::shared_ptr<server_session>> sessions_;
     std::atomic_bool suppress_exceptions_;
+    callback_type callback_on_connection_;
+    callback_type callback_on_disconnection_;
     RPCLIB_CREATE_LOG_CHANNEL(server)
 };
 
@@ -131,8 +136,19 @@ void server::close_sessions() { pimpl->close_sessions(); }
 void server::close_session(std::shared_ptr<detail::server_session> const &s) {
   auto it = std::find(begin(pimpl->sessions_), end(pimpl->sessions_), s);
   if (it != end(pimpl->sessions_)) {
+    if (pimpl->callback_on_disconnection_) {
+        pimpl->callback_on_disconnection_(*it);
+    }
     pimpl->sessions_.erase(it);
   }
+}
+
+void server::set_on_connection(callback_type obj) {
+    pimpl->callback_on_connection_ = obj;
+}
+
+void server::set_on_disconnection(callback_type obj) {
+    pimpl->callback_on_disconnection_ = obj;
 }
 
 } /* rpc */
