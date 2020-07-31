@@ -34,9 +34,9 @@ void server_session::start() { do_read(); }
 void server_session::close() {
     LOG_INFO("Closing session.");
     exit_ = true;
-    write_strand_.post([this]() {
+    write_strand_.post([this, self=shared_from_base<server_session>()]() {
         socket_.close();
-        parent_->close_session(shared_from_base<server_session>());
+        parent_->close_session(self);
     });
 }
 
