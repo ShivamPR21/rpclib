@@ -39,6 +39,7 @@ struct server::impl {
 
     void start_accept() {
         acceptor_.async_accept(socket_, [this](std::error_code ec) {
+            std::lock_guard<std::mutex> lock(_mutex);
             if (!ec) {
                 LOG_INFO("Accepted connection.");
                 auto s = std::make_shared<server_session>(
@@ -58,10 +59,22 @@ struct server::impl {
     }
 
     void close_sessions() {
+        std::lock_guard<std::mutex> lock(_mutex);
         for (auto &session : sessions_) {
             session->close();
         }
         sessions_.clear();
+    }
+
+    void close_session(std::shared_ptr<detail::server_session> const &s) {
+        std::lock_guard<std::mutex> lock(_mutex);
+        auto it = std::find(begin(sessions_), end(sessions_), s);
+        if (it != end(sessions_)) {
+            if (callback_on_disconnection_) {
+                callback_on_disconnection_(*it);
+            }
+            sessions_.erase(it);
+        }
     }
 
     void stop() {
@@ -78,6 +91,7 @@ struct server::impl {
     std::atomic_bool suppress_exceptions_;
     callback_type callback_on_connection_;
     callback_type callback_on_disconnection_;
+    std::mutex _mutex;
     RPCLIB_CREATE_LOG_CHANNEL(server)
 };
 
@@ -134,13 +148,7 @@ void server::stop() { pimpl->stop(); }
 void server::close_sessions() { pimpl->close_sessions(); }
 
 void server::close_session(std::shared_ptr<detail::server_session> const &s) {
-  auto it = std::find(begin(pimpl->sessions_), end(pimpl->sessions_), s);
-  if (it != end(pimpl->sessions_)) {
-    if (pimpl->callback_on_disconnection_) {
-        pimpl->callback_on_disconnection_(*it);
-    }
-    pimpl->sessions_.erase(it);
-  }
+    pimpl->close_session(s);
 }
 
 void server::set_on_connection(callback_type obj) {

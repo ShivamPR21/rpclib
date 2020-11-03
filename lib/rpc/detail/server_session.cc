@@ -32,11 +32,13 @@ server_session::server_session(server *srv, RPCLIB_ASIO::io_service *io,
 void server_session::start() { do_read(); }
 
 void server_session::close() {
+    auto self(shared_from_base<server_session>());
     LOG_INFO("Closing session.");
     exit_ = true;
-    write_strand_.post([this, self=shared_from_base<server_session>()]() {
+    write_strand_.post([this, self]() {
         socket_.close();
-        parent_->close_session(self);
+        if (parent_)
+            parent_->close_session(self);
     });
 }
 
