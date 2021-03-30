@@ -42,6 +42,7 @@ struct server::impl {
             std::lock_guard<std::mutex> lock(_mutex);
             if (!ec) {
                 LOG_INFO("Accepted connection.");
+                socket_.set_option(RPCLIB_ASIO::ip::tcp::no_delay(true));
                 auto s = std::make_shared<server_session>(
                     parent_, &io_, std::move(socket_), parent_->disp_,
                     suppress_exceptions_);
