@@ -23,6 +23,27 @@ public:
                  RPCLIB_ASIO::ip::tcp::socket socket)
         : socket_(std::move(socket)), write_strand_(*io), exit_(false) {}
 
+    void close() {
+        exit_ = true;
+
+        auto self = shared_from_this();
+        write_strand_.post([this, self]() {
+            LOG_INFO("Closing socket");
+            std::error_code e;
+            socket_.shutdown(
+                RPCLIB_ASIO::ip::tcp::socket::shutdown_both, e);
+            if (e) {
+                LOG_WARN("std::system_error during socket shutdown. "
+                            "Code: {}. Message: {}", e.value(), e.message());
+            }
+            socket_.close();
+        });
+    }
+
+    bool is_closed() const {
+        return exit_.load();
+    }
+
     void do_write() {
         if (exit_) {
             return;
@@ -46,6 +67,7 @@ public:
                     } else {
                         LOG_ERROR("Error while writing to socket: {}", ec);
                     }
+<<<<<<< HEAD
 
                     if (exit_) {
                         LOG_INFO("Closing socket");
@@ -59,6 +81,8 @@ public:
                         }
                         socket_.close();
                     }
+=======
+>>>>>>> 17ae701a86a8e8963df874dc19ac7c03fac9ecb3
                 }));
     }
 
@@ -71,7 +95,9 @@ public:
         do_write();
     }
 
-    friend class rpc::client;
+    RPCLIB_ASIO::ip::tcp::socket& socket() {
+        return socket_;
+    }
 
 protected:
     template <typename Derived>
@@ -79,15 +105,14 @@ protected:
         return std::static_pointer_cast<Derived>(shared_from_this());
     }
 
-protected:
+    RPCLIB_ASIO::strand& write_strand() {
+        return write_strand_;
+    }
+
+private:
     RPCLIB_ASIO::ip::tcp::socket socket_;
     RPCLIB_ASIO::strand write_strand_;
     std::atomic_bool exit_{false};
-    bool exited_ = false;
-    std::mutex m_exit_;
-    std::condition_variable cv_exit_;
-
-private:
     std::deque<RPCLIB_MSGPACK::sbuffer> write_queue_;
     RPCLIB_CREATE_LOG_CHANNEL(async_writer)
 };
